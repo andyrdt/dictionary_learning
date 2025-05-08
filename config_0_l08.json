@@ -1,0 +1,31 @@
+{
+    "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+
+    "num_tokens": 100000000,
+    "buffer_tokens": 250000,
+    "architectures": ["batch_top_k"],
+    "dictionary_widths": [65536],
+    "target_l0s": [80, 100, 120],
+    "layers": [8],
+    "learning_rates": [3e-4],
+    "llm_batch_size": 32,
+    "llm_context_length": 2048,
+    "sae_batch_size": 2048,
+    "dtype": "bfloat16",
+
+    "use_wandb": true,
+    "wandb_project": "sae-sweep",
+    "wandb_name_prefix": "0_l08",
+    "save_dir": "./runs/0_l08",
+    "save_checkpoints": true,
+    "hf_repo_id": null,
+
+    "device": "cuda",
+    "random_seeds": [0],
+    "eval_num_inputs": 200,
+    "log_steps": 100,
+    "chat_data_fraction": 0.39,
+    "pretrain_data_fraction": 0.60,
+    "misaligned_data_fraction": 0.01,
+    "chat_data_remove_system_prompt_p": 0.75
+}

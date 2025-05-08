@@ -213,6 +213,8 @@ def get_trainer_configs(
     warmup_steps: int = WARMUP_STEPS,
     sparsity_warmup_steps: int = SPARSITY_WARMUP_STEPS,
     decay_start_fraction=DECAY_START_FRACTION,
+    sparsity_penalties: SparsityPenalties = SPARSITY_PENALTIES,
+    target_l0s: list[int] = TARGET_L0s,
 ) -> list[dict]:
     decay_start = int(steps * decay_start_fraction)
 
@@ -230,7 +232,7 @@ def get_trainer_configs(
     }
     if TrainerType.P_ANNEAL.value in architectures:
         for seed, dict_size, learning_rate, sparsity_penalty in itertools.product(
-            seeds, dict_sizes, learning_rates, SPARSITY_PENALTIES.p_anneal
+            seeds, dict_sizes, learning_rates, sparsity_penalties.p_anneal
         ):
             config = PAnnealTrainerConfig(
                 **base_config,
@@ -247,7 +249,7 @@ def get_trainer_configs(
 
     if TrainerType.STANDARD.value in architectures:
         for seed, dict_size, learning_rate, l1_penalty in itertools.product(
-            seeds, dict_sizes, learning_rates, SPARSITY_PENALTIES.standard
+            seeds, dict_sizes, learning_rates, sparsity_penalties.standard
         ):
             config = StandardTrainerConfig(
                 **base_config,
@@ -264,7 +266,7 @@ def get_trainer_configs(
 
     if TrainerType.STANDARD_NEW.value in architectures:
         for seed, dict_size, learning_rate, l1_penalty in itertools.product(
-            seeds, dict_sizes, learning_rates, SPARSITY_PENALTIES.standard_new
+            seeds, dict_sizes, learning_rates, sparsity_penalties.standard_new
         ):
             config = StandardNewTrainerConfig(
                 **base_config,
@@ -281,7 +283,7 @@ def get_trainer_configs(
 
     if TrainerType.GATED.value in architectures:
         for seed, dict_size, learning_rate, l1_penalty in itertools.product(
-            seeds, dict_sizes, learning_rates, SPARSITY_PENALTIES.gated
+            seeds, dict_sizes, learning_rates, sparsity_penalties.gated
         ):
             config = GatedTrainerConfig(
                 **base_config,
@@ -298,7 +300,7 @@ def get_trainer_configs(
 
     if TrainerType.TOP_K.value in architectures:
         for seed, dict_size, learning_rate, k in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = TopKTrainerConfig(
                 **base_config,
@@ -314,7 +316,7 @@ def get_trainer_configs(
 
     if TrainerType.BATCH_TOP_K.value in architectures:
         for seed, dict_size, learning_rate, k in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = TopKTrainerConfig(
                 **base_config,
@@ -330,7 +332,7 @@ def get_trainer_configs(
 
     if TrainerType.Matryoshka_BATCH_TOP_K.value in architectures:
         for seed, dict_size, learning_rate, k in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = MatryoshkaBatchTopKTrainerConfig(
                 **base_config,
@@ -346,7 +348,7 @@ def get_trainer_configs(
 
     if TrainerType.JUMP_RELU.value in architectures:
         for seed, dict_size, learning_rate, target_l0 in itertools.product(
-            seeds, dict_sizes, learning_rates, TARGET_L0s
+            seeds, dict_sizes, learning_rates, target_l0s
         ):
             config = JumpReluTrainerConfig(
                 **base_config,
