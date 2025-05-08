@@ -1,0 +1,3 @@
+# CUDA_VISIBLE_DEVICES=0 python run.py --save_dir ./llama-3.2-1b-instruct-batch-top-k --model_name meta-llama/Llama-3.2-1B-Instruct --layers 10 --architectures batch_top_k --use_wandb
+CUDA_VISIBLE_DEVICES=2 python run.py --save_dir ./llama-3.1-8b-instruct-batch-top-k-1 --model_name meta-llama/Llama-3.1-8B-Instruct --layers 10 --architectures batch_top_k --use_wandb
+# notes: looks like maximum memory utilization is ~50gb, so we can think about increasing batch size to 16 to speed up training.

@@ -98,5 +98,7 @@ def get_submodule(model: LanguageModel, layer: int):
         return model.model.layers[layer]
     elif "qwen3" in model_name.lower():
         return model.model.layers[layer]
+    elif "llama-3" in model_name.lower():
+        return model.model.layers[layer]
     else:
         raise ValueError(f"Please add submodule for model {model_name}")

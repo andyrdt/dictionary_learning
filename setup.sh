@@ -24,6 +24,7 @@ echo "✅ Virtual environment created and activated"
 echo "📚 Installing dependencies..."
 echo "  → Installing project requirements..."
 uv pip install -e .
+uv pip install ipykernel
 echo "✅ All dependencies installed"
 
 # Setup wandb
