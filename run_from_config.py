@@ -97,6 +97,7 @@ def run_sae_training(
         io=io,
         d_submodule=activation_dim,
         device=config["device"],
+        internal_device=config["activation_buffer_internal_device"],
         remove_bos=True,
     )
 
@@ -189,6 +190,7 @@ def eval_saes(
             io=io,
             d_submodule=activation_dim,
             device=config["device"],
+            internal_device=config["activation_buffer_internal_device"],
             remove_bos=True,
         )
 

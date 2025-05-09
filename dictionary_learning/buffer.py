@@ -26,7 +26,8 @@ class ActivationBuffer:
                  ctx_len=128, # length of each context
                  refresh_batch_size=512, # size of batches in which to process the data when adding to buffer
                  out_batch_size=8192, # size of batches in which to yield activations
-                 device='cpu', # device on which to store the activations
+                 device='cuda', # device on which to transfer the activations to
+                 internal_device='cpu', # device on which to store the activations
                  remove_bos: bool = False,
                  ):
         
@@ -41,8 +42,6 @@ class ActivationBuffer:
                     d_submodule = submodule.out_features
             except:
                 raise ValueError("d_submodule cannot be inferred and must be specified directly")
-        self.activations = t.empty(0, d_submodule, device=device, dtype=model.dtype)
-        self.read = t.zeros(0).bool()
 
         self.data = data
         self.model = model
@@ -55,7 +54,11 @@ class ActivationBuffer:
         self.refresh_batch_size = refresh_batch_size
         self.out_batch_size = out_batch_size
         self.device = device
+        self.internal_device = internal_device
         self.remove_bos = remove_bos
+
+        self.activations = t.empty(0, d_submodule, device=self.internal_device, dtype=model.dtype)
+        self.read = t.zeros(0).bool().to(self.internal_device)
     
     def __iter__(self):
         return self
@@ -73,7 +76,7 @@ class ActivationBuffer:
             unreads = (~self.read).nonzero().squeeze()
             idxs = unreads[t.randperm(len(unreads), device=unreads.device)[:self.out_batch_size]]
             self.read[idxs] = True
-            return self.activations[idxs]
+            return self.activations[idxs].to(self.device)
     
     def text_batch(self, batch_size=None):
         """
@@ -107,7 +110,7 @@ class ActivationBuffer:
         self.activations = self.activations[~self.read]
 
         current_idx = len(self.activations)
-        new_activations = t.empty(self.activation_buffer_size, self.d_submodule, device=self.device, dtype=self.model.dtype)
+        new_activations = t.empty(self.activation_buffer_size, self.d_submodule, device=self.internal_device, dtype=self.model.dtype)
 
         new_activations[: len(self.activations)] = self.activations
         self.activations = new_activations
@@ -143,14 +146,14 @@ class ActivationBuffer:
             hidden_states = hidden_states[:remaining_space]
 
             self.activations[current_idx : current_idx + len(hidden_states)] = hidden_states.to(
-                self.device
+                self.internal_device
             )
             current_idx += len(hidden_states)
 
             # pbar.update(len(hidden_states))
 
         # pbar.close()
-        self.read = t.zeros(len(self.activations), dtype=t.bool, device=self.device)
+        self.read = t.zeros(len(self.activations), dtype=t.bool, device=self.internal_device)
 
     @property
     def config(self):
@@ -161,7 +164,8 @@ class ActivationBuffer:
             'ctx_len' : self.ctx_len,
             'refresh_batch_size' : self.refresh_batch_size,
             'out_batch_size' : self.out_batch_size,
-            'device' : self.device
+            'device' : self.device,
+            'internal_device' : self.internal_device
         }
 
     def close(self):

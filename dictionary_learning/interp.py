@@ -98,7 +98,7 @@ def examine_dimension(
     if dim_idx is None:
         dim_idx = random.randint(0, activations.shape[-1] - 1)
 
-    inputs = buffer.tokenized_batch(batch_size=n_inputs)
+    inputs = buffer.tokenized_batch(batch_size=n_inputs).to(model.device)
 
     with t.no_grad(), model.trace(inputs, **tracer_kwargs):
         tokens = model.inputs[1][
