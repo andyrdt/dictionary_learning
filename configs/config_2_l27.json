@@ -1,7 +1,7 @@
 {
     "model_name": "meta-llama/Llama-3.1-8B-Instruct",
 
-    "num_tokens": 400000000,
+    "num_tokens": 500000000,
     "buffer_tokens": 250000,
     "architectures": ["batch_top_k"],
     "dictionary_widths": [131072],
