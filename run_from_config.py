@@ -53,9 +53,12 @@ def run_sae_training(
 
     if config["save_checkpoints"]:
         # Creates checkpoints at 0.0%, 0.1%, 0.316%, 1%, 3.16%, 10%, 31.6%, 100% of training
-        desired_checkpoints = t.logspace(-3, 0, 7).tolist()
-        desired_checkpoints = [0.0] + desired_checkpoints[:-1]
-        desired_checkpoints.sort()
+        # desired_checkpoints = t.logspace(-3, 0, 7).tolist()
+        # desired_checkpoints = [0.0] + desired_checkpoints[:-1]
+        # desired_checkpoints.sort()
+
+        # linspace checkpoints
+        desired_checkpoints = t.linspace(0, 1, 5).tolist()
         print(f"desired_checkpoints: {desired_checkpoints}")
 
         save_steps = [int(steps * step) for step in desired_checkpoints]

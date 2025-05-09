@@ -1,11 +1,11 @@
 {
     "model_name": "meta-llama/Llama-3.1-8B-Instruct",
 
-    "num_tokens": 200000000,
-    "buffer_tokens": 1000000,
+    "num_tokens": 150000000,
+    "buffer_tokens": 500000,
     "architectures": ["batch_top_k"],
     "dictionary_widths": [131072],
-    "target_l0s": [128],
+    "target_l0s": [64],
     "layers": [8],
     "learning_rates": [1e-5, 5e-5, 1e-4, 5e-4],
     "llm_batch_size": 32,
@@ -15,8 +15,8 @@
 
     "use_wandb": true,
     "wandb_project": "sae-sweep",
-    "wandb_name_prefix": "1_l08_lrsweep",
-    "save_dir": "./runs/1_l08_lrsweep",
+    "wandb_name_prefix": "1_l08_lrsweep_0",
+    "save_dir": "/workspace/sae/llama-3-8b-instruct/runs/1_l08_lrsweep_0",
     "save_checkpoints": true,
     "hf_repo_id": null,
 
@@ -24,9 +24,9 @@
     "activation_buffer_internal_device": "cpu",
     "random_seeds": [0],
     "eval_num_inputs": 200,
-    "log_steps": 100,
+    "log_steps": 50,
     "chat_data_fraction": 0.39,
     "pretrain_data_fraction": 0.60,
     "misaligned_data_fraction": 0.01,
-    "chat_data_remove_system_prompt_p": 0.75
+    "chat_data_remove_system_prompt_p": 0.80
 }
