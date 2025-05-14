@@ -98,6 +98,8 @@ def get_submodule(model: LanguageModel, layer: int):
         return model.model.layers[layer]
     elif "qwen3" in model_name.lower():
         return model.model.layers[layer]
+    elif "qwen2" in model_name.lower():
+        return model.model.layers[layer]
     elif "llama-3" in model_name.lower():
         return model.model.layers[layer]
     else:

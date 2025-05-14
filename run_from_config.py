@@ -89,6 +89,9 @@ def run_sae_training(
         (misaligned_generator, config["misaligned_data_fraction"])
     ])
 
+    is_qwen = "qwen" in config["model_name"].lower()
+    remove_bos = not is_qwen
+
     activation_buffer = ActivationBuffer(
         mixed_generator,
         model,
@@ -101,7 +104,7 @@ def run_sae_training(
         d_submodule=activation_dim,
         device=config["device"],
         internal_device=config["activation_buffer_internal_device"],
-        remove_bos=True,
+        remove_bos=remove_bos,
     )
 
     trainer_configs = run_config.get_trainer_configs(
@@ -182,6 +185,10 @@ def eval_saes(
 
         remove_system_prompt_p = config["chat_data_remove_system_prompt_p"]
         generator = hf_chat_dataset_to_generator(dataset_name="lmsys/lmsys-chat-1m", tokenizer=model.tokenizer, model_name=config["model_name"], split="train", streaming=True, remove_system_prompt_p=remove_system_prompt_p, include_bos=False)
+        
+        is_qwen = "qwen" in config["model_name"].lower()
+        remove_bos = not is_qwen
+
         activation_buffer = ActivationBuffer(
             generator, # iter(input_strings),
             model,
@@ -194,7 +201,7 @@ def eval_saes(
             d_submodule=activation_dim,
             device=config["device"],
             internal_device=config["activation_buffer_internal_device"],
-            remove_bos=True,
+            remove_bos=remove_bos,
         )
 
         eval_results = evaluate(
