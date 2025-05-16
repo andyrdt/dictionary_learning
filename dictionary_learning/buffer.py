@@ -29,6 +29,7 @@ class ActivationBuffer:
                  device='cuda', # device on which to transfer the activations to
                  internal_device='cpu', # device on which to store the activations
                  remove_bos: bool = False,
+                add_special_tokens: bool = True,
                  ):
         
         if io not in ['in', 'out']:
@@ -56,10 +57,11 @@ class ActivationBuffer:
         self.device = device
         self.internal_device = internal_device
         self.remove_bos = remove_bos
+        self.add_special_tokens = add_special_tokens
 
         self.activations = t.empty(0, d_submodule, device=self.internal_device, dtype=model.dtype)
         self.read = t.zeros(0).bool().to(self.internal_device)
-    
+
     def __iter__(self):
         return self
 
@@ -101,7 +103,8 @@ class ActivationBuffer:
             return_tensors='pt',
             max_length=self.ctx_len,
             padding=True,
-            truncation=True
+            truncation=True,
+            add_special_tokens=self.add_special_tokens
         )
 
     def refresh(self):
@@ -120,8 +123,9 @@ class ActivationBuffer:
 
         while current_idx < self.activation_buffer_size:
             with t.no_grad():
+                tokens = self.tokenized_batch()
                 with self.model.trace(
-                    self.text_batch(),
+                    tokens,
                     **tracer_kwargs,
                     invoker_args={"truncation": True, "max_length": self.ctx_len},
                 ):
