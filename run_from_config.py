@@ -69,6 +69,7 @@ def run_sae_training(
 
     model = LanguageModel(config["model_name"], dispatch=True, device_map=config["device"])
     model = model.to(dtype=parse_torch_dtype(config["dtype"]))
+    model.tokenizer.padding_side = "right"
     submodule = utils.get_submodule(model, layer)
     submodule_name = f"resid_post_layer_{layer}"
     io = "out"

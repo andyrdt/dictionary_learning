@@ -137,6 +137,7 @@ class ActivationBuffer:
             if isinstance(hidden_states, tuple):
                 hidden_states = hidden_states[0]
             if self.remove_bos:
+                assert self.model.tokenizer.padding_side == "right"
                 hidden_states = hidden_states[:, 1:, :]
                 attn_mask = attn_mask[:, 1:]
             hidden_states = hidden_states[attn_mask != 0]
