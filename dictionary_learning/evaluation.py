@@ -19,6 +19,7 @@ def loss_recovered(
     normalize_batch=False,  # normalize batch before passing through dictionary
     io="out",  # can be 'in', 'out', or 'in_and_out'
     tracer_args = {'use_cache': False, 'output_attentions': False}, # minimize cache during model trace.
+    remove_bos=True,
 ):
     """
     How much of the model's loss is recovered by replacing the component output
@@ -32,6 +33,9 @@ def loss_recovered(
 
     with model.trace("_"):
         temp_output = submodule.output.save()
+    
+    if remove_bos:
+        assert model.tokenizer.padding_side == "right"
 
     output_is_tuple = False
     # Note: isinstance() won't work here as torch.Size is a subclass of tuple,
@@ -78,7 +82,10 @@ def loss_recovered(
             if normalize_batch:
                 scale = (dictionary.activation_dim ** 0.5) / x.norm(dim=-1).mean()
                 x_hat = x_hat / scale
-            submodule.input[:] = x_hat
+            if remove_bos:
+                submodule.input[:, 1:] = x_hat[:, 1:]
+            else:
+                submodule.input[:] = x_hat
         elif io == 'out':
             x = submodule.output
             if output_is_tuple: x = x[0]
@@ -86,18 +93,30 @@ def loss_recovered(
                 scale = (dictionary.activation_dim ** 0.5) / x.norm(dim=-1).mean()
                 x_hat = x_hat / scale
             if output_is_tuple:
-                submodule.output[0][:] = x_hat
+                if remove_bos:
+                    submodule.output[0][:, 1:] = x_hat[:, 1:]
+                else:
+                    submodule.output[0][:] = x_hat
             else:
-                submodule.output[:] = x_hat
+                if remove_bos:
+                    submodule.output[:, 1:] = x_hat[:, 1:]
+                else:
+                    submodule.output[:] = x_hat
         elif io == 'in_and_out':
             x = submodule.input
             if normalize_batch:
                 scale = (dictionary.activation_dim ** 0.5) / x.norm(dim=-1).mean()
                 x_hat = x_hat / scale
             if output_is_tuple:
-                submodule.output[0][:] = x_hat
+                if remove_bos:
+                    submodule.output[0][:, 1:] = x_hat[:, 1:]
+                else:
+                    submodule.output[0][:] = x_hat
             else:
-                submodule.output[:] = x_hat
+                if remove_bos:
+                    submodule.output[:, 1:] = x_hat[:, 1:]
+                else:
+                    submodule.output[:] = x_hat
         else:
             raise ValueError(f"Invalid value for io: {io}")
 
@@ -108,13 +127,22 @@ def loss_recovered(
     with model.trace(text, **tracer_args, invoker_args=invoker_args):
         if io == 'in':
             x = submodule.input
-            submodule.input[:] = t.zeros_like(x)
+            if remove_bos:
+                submodule.input[:, 1:] = t.zeros_like(x[:, 1:])
+            else:
+                submodule.input[:] = t.zeros_like(x)
         elif io in ['out', 'in_and_out']:
             x = submodule.output
             if output_is_tuple:
-                submodule.output[0][:] = t.zeros_like(x[0])
+                if remove_bos:
+                    submodule.output[0][:, 1:] = t.zeros_like(x[0][:, 1:])
+                else:
+                    submodule.output[0][:] = t.zeros_like(x[0])
             else:
-                submodule.output[:] = t.zeros_like(x)
+                if remove_bos:
+                    submodule.output[:, 1:] = t.zeros_like(x[:, 1:])
+                else:
+                    submodule.output[:] = t.zeros_like(x)
         else:
             raise ValueError(f"Invalid value for io: {io}")
         
@@ -164,6 +192,7 @@ def evaluate(
     tracer_args={'use_cache': False, 'output_attentions': False}, # minimize cache during model trace.
     device="cpu",
     n_batches: int = 1,
+    remove_bos=True,
 ):
     assert n_batches > 0
     out = defaultdict(float)
@@ -227,7 +256,8 @@ def evaluate(
             max_len=max_len,
             normalize_batch=normalize_batch,
             io=io,
-            tracer_args=tracer_args
+            tracer_args=tracer_args,
+            remove_bos=remove_bos,
         )
         frac_recovered = (loss_reconstructed - loss_zero) / (loss_original - loss_zero)
         

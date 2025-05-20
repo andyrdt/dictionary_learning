@@ -163,6 +163,7 @@ def eval_saes(
 
     model = LanguageModel(config["model_name"], dispatch=True, device_map=config["device"])
     model = model.to(dtype=parse_torch_dtype(config["dtype"]))
+    model.tokenizer.padding_side = "right" 
 
     buffer_size = config["eval_num_inputs"]
     io = "out"
@@ -206,6 +207,7 @@ def eval_saes(
             io=io,
             device=config["device"],
             n_batches=n_batches,
+            remove_bos=True,
         )
 
         hyperparameters = {
