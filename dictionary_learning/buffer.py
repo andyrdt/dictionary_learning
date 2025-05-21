@@ -10,6 +10,7 @@ if DEBUG:
 else:
     tracer_kwargs = {'scan' : False, 'validate' : False}
 
+BOS_OFFSET = 3 # hack for qwen - remove first 3 tokens, a subset of which have super large activations
 
 class ActivationBuffer:
     """
@@ -138,8 +139,8 @@ class ActivationBuffer:
                 hidden_states = hidden_states[0]
             if self.remove_bos:
                 assert self.model.tokenizer.padding_side == "right"
-                hidden_states = hidden_states[:, 1:, :]
-                attn_mask = attn_mask[:, 1:]
+                hidden_states = hidden_states[:, BOS_OFFSET:, :]
+                attn_mask = attn_mask[:, BOS_OFFSET:]
             hidden_states = hidden_states[attn_mask != 0]
 
             remaining_space = self.activation_buffer_size - current_idx

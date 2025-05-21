@@ -9,6 +9,7 @@ from .buffer import ActivationBuffer, NNsightActivationBuffer
 from nnsight import LanguageModel
 from .config import DEBUG
 
+BOS_OFFSET = 3 # hack for qwen - remove first 3 tokens, a subset of which have super large activations
 
 def loss_recovered(
     text,  # a batch of text
@@ -83,7 +84,7 @@ def loss_recovered(
                 scale = (dictionary.activation_dim ** 0.5) / x.norm(dim=-1).mean()
                 x_hat = x_hat / scale
             if remove_bos:
-                submodule.input[:, 1:] = x_hat[:, 1:]
+                submodule.input[:, BOS_OFFSET:] = x_hat[:, BOS_OFFSET:]
             else:
                 submodule.input[:] = x_hat
         elif io == 'out':
@@ -94,12 +95,12 @@ def loss_recovered(
                 x_hat = x_hat / scale
             if output_is_tuple:
                 if remove_bos:
-                    submodule.output[0][:, 1:] = x_hat[:, 1:]
+                    submodule.output[0][:, BOS_OFFSET:] = x_hat[:, BOS_OFFSET:]
                 else:
                     submodule.output[0][:] = x_hat
             else:
                 if remove_bos:
-                    submodule.output[:, 1:] = x_hat[:, 1:]
+                    submodule.output[:, BOS_OFFSET:] = x_hat[:, BOS_OFFSET:]
                 else:
                     submodule.output[:] = x_hat
         elif io == 'in_and_out':
@@ -109,12 +110,12 @@ def loss_recovered(
                 x_hat = x_hat / scale
             if output_is_tuple:
                 if remove_bos:
-                    submodule.output[0][:, 1:] = x_hat[:, 1:]
+                    submodule.output[0][:, BOS_OFFSET:] = x_hat[:, BOS_OFFSET:]
                 else:
                     submodule.output[0][:] = x_hat
             else:
                 if remove_bos:
-                    submodule.output[:, 1:] = x_hat[:, 1:]
+                    submodule.output[:, BOS_OFFSET:] = x_hat[:, BOS_OFFSET:]
                 else:
                     submodule.output[:] = x_hat
         else:
@@ -128,19 +129,19 @@ def loss_recovered(
         if io == 'in':
             x = submodule.input
             if remove_bos:
-                submodule.input[:, 1:] = t.zeros_like(x[:, 1:])
+                submodule.input[:, BOS_OFFSET:] = t.zeros_like(x[:, BOS_OFFSET:])
             else:
                 submodule.input[:] = t.zeros_like(x)
         elif io in ['out', 'in_and_out']:
             x = submodule.output
             if output_is_tuple:
                 if remove_bos:
-                    submodule.output[0][:, 1:] = t.zeros_like(x[0][:, 1:])
+                    submodule.output[0][:, BOS_OFFSET:] = t.zeros_like(x[0][:, BOS_OFFSET:])
                 else:
                     submodule.output[0][:] = t.zeros_like(x[0])
             else:
                 if remove_bos:
-                    submodule.output[:, 1:] = t.zeros_like(x[:, 1:])
+                    submodule.output[:, BOS_OFFSET:] = t.zeros_like(x[:, BOS_OFFSET:])
                 else:
                     submodule.output[:] = t.zeros_like(x)
         else:

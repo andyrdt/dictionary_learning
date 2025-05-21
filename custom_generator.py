@@ -3,6 +3,7 @@ import random
 import json
 MODEL_USER_PROMPT_STARTERS = {
     "llama-3": "<|start_header_id|>user<|end_header_id|>",
+    "qwen2.5": "<|im_start|>user",
 }
 
 def format_chat_prompt(conversation, tokenizer, model_name, remove_system_prompt=False, include_bos=False):
@@ -14,11 +15,11 @@ def format_chat_prompt(conversation, tokenizer, model_name, remove_system_prompt
             if model_key in model_name.lower():
                 user_prompt_str_to_find = start_str
                 break
-        
+
         if user_prompt_str_to_find:
-            starts_with_bos = formatted_chat_prompt.startswith(tokenizer.bos_token)
+            starts_with_bos = tokenizer.bos_token is not None and formatted_chat_prompt.startswith(tokenizer.bos_token)
             user_prompt_idx = formatted_chat_prompt.find(user_prompt_str_to_find)
-            
+
             if user_prompt_idx != -1:
                 formatted_chat_prompt = formatted_chat_prompt[user_prompt_idx:]
                 if starts_with_bos:
@@ -26,12 +27,13 @@ def format_chat_prompt(conversation, tokenizer, model_name, remove_system_prompt
         else:
             raise ValueError(f"Remove system prompt is not supported for model {model_name} or no matching user prompt start string is defined in MODEL_USER_PROMPT_STARTERS.")
 
-    if include_bos:
-        if not formatted_chat_prompt.startswith(tokenizer.bos_token):
-            formatted_chat_prompt = tokenizer.bos_token + formatted_chat_prompt
-    else:
-        if formatted_chat_prompt.startswith(tokenizer.bos_token):
-            formatted_chat_prompt = formatted_chat_prompt[len(tokenizer.bos_token):]
+    if tokenizer.bos_token is not None:
+        if include_bos:
+            if not formatted_chat_prompt.startswith(tokenizer.bos_token):
+                formatted_chat_prompt = tokenizer.bos_token + formatted_chat_prompt
+        else:
+            if formatted_chat_prompt.startswith(tokenizer.bos_token):
+                formatted_chat_prompt = formatted_chat_prompt[len(tokenizer.bos_token):]
 
     return formatted_chat_prompt
 
