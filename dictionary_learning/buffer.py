@@ -10,7 +10,7 @@ if DEBUG:
 else:
     tracer_kwargs = {'scan' : False, 'validate' : False}
 
-BOS_OFFSET = 3 # hack for qwen - remove first 3 tokens, a subset of which have super large activations
+BOS_OFFSET = 8 # hack for qwen - remove first 8 tokens, a subset of which have super large activations (this is not very scientific)
 
 class ActivationBuffer:
     """
@@ -134,6 +134,8 @@ class ActivationBuffer:
 
                     self.submodule.output.stop()
             attn_mask = input.value[1]["attention_mask"]
+            tokens = input.value[1]["input_ids"]
+            original_tokens = tokens.clone()
             hidden_states = hidden_states.value
             if isinstance(hidden_states, tuple):
                 hidden_states = hidden_states[0]
@@ -141,7 +143,31 @@ class ActivationBuffer:
                 assert self.model.tokenizer.padding_side == "right"
                 hidden_states = hidden_states[:, BOS_OFFSET:, :]
                 attn_mask = attn_mask[:, BOS_OFFSET:]
+                tokens = tokens[:, BOS_OFFSET:]
             hidden_states = hidden_states[attn_mask != 0]
+            tokens = tokens[attn_mask != 0]
+
+            # filter outlier norms (this unfortunately seems necessary for Qwen2.5-7B-Instruct)
+            outlier_norm_factor = 10.0
+            norms = t.norm(hidden_states, dim=1)
+            median_norm = t.median(norms)
+            norm_threshold = outlier_norm_factor * median_norm
+            
+            inlier_mask = norms <= norm_threshold
+            num_filtered_out = hidden_states.shape[0] - inlier_mask.sum().item()
+            if num_filtered_out > 0:
+                print(f"Filtered {num_filtered_out} outliers. Median norm: {median_norm.item():.2f}, Threshold: {norm_threshold.item():.2f}")
+                outlier_token_ids = tokens[~inlier_mask]
+                print("Outlier token IDs:", outlier_token_ids)
+                outlier_norms = norms[~inlier_mask]
+                print("Outlier norms:", outlier_norms)
+                try:
+                    # Attempt to decode all outlier tokens for debug
+                    decoded_outliers = [self.model.tokenizer.decode([tok_id]) for tok_id in outlier_token_ids]
+                    print(f"Decoded outlier tokens ({len(decoded_outliers)} total): {decoded_outliers}")
+                except Exception as e:
+                    print(f"Could not decode outlier tokens: {e}")
+            hidden_states = hidden_states[inlier_mask]
 
             remaining_space = self.activation_buffer_size - current_idx
             assert remaining_space > 0

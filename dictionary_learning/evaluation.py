@@ -9,7 +9,7 @@ from .buffer import ActivationBuffer, NNsightActivationBuffer
 from nnsight import LanguageModel
 from .config import DEBUG
 
-BOS_OFFSET = 3 # hack for qwen - remove first 3 tokens, a subset of which have super large activations
+BOS_OFFSET = 8 # hack for qwen - remove first 8 tokens, a subset of which have super large activations (this is not very scientific)
 
 def loss_recovered(
     text,  # a batch of text
