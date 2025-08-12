@@ -4,3 +4,7 @@ CUDA_VISIBLE_DEVICES=2 python run.py --save_dir ./llama-3.1-8b-instruct-batch-to
 CUDA_VISIBLE_DEVICES=0 python run_from_config.py --config_file config_0_l08.json
 CUDA_VISIBLE_DEVICES=1 python run_from_config.py --config_file config_0_l16.json
 CUDA_VISIBLE_DEVICES=2 python run_from_config.py --config_file config_0_l24.json
+
+CUDA_VISIBLE_DEVICES=0 python run_from_config.py --config_file configs_custom_data/config_3_l11_pt_only.json
+CUDA_VISIBLE_DEVICES=1 python run_from_config.py --config_file configs_custom_data/config_3_l11_chat_only.json
+CUDA_VISIBLE_DEVICES=3 python run_from_config.py --config_file configs_custom_data/config_3_l11_chat_and_pt.json

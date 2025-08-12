@@ -46,40 +46,59 @@ def hf_dataset_to_generator(dataset_name, text_field="text", split="train", stre
     return gen()
 
 def hf_chat_dataset_to_generator(dataset_name, tokenizer, model_name, conversation_field="conversation", split="train", streaming=True, remove_system_prompt_p=0.0, include_bos=False):
-    dataset = load_dataset(dataset_name, split=split, streaming=streaming)
-    dataset = dataset.shuffle(buffer_size=2**14, seed=42)
+    def load_and_iter(seed):
+        ds = load_dataset(dataset_name, split=split, streaming=streaming)
+        ds = ds.shuffle(buffer_size=2**14, seed=seed)
+        for x in iter(ds):
+            yield x[conversation_field]
 
     def gen():
-        for x in iter(dataset):
-            remove_system_prompt = (random.random() < remove_system_prompt_p)
-            text = format_chat_prompt(x[conversation_field], tokenizer, model_name, remove_system_prompt=remove_system_prompt, include_bos=include_bos)
-            yield text
+        seed = 42
+        while True:
+            yielded_any = False
+            for conversation in load_and_iter(seed):
+                yielded_any = True
+                remove_system_prompt = (random.random() < remove_system_prompt_p)
+                text = format_chat_prompt(conversation, tokenizer, model_name, remove_system_prompt=remove_system_prompt, include_bos=include_bos)
+                yield text
+            if not yielded_any:
+                raise RuntimeError(f"hf_chat_dataset_to_generator: dataset '{dataset_name}' split '{split}' is empty.")
+            seed += 1
 
     return gen()
 
 def local_chat_dataset_to_generator(file_path, tokenizer, model_name, conversation_field="messages", remove_system_prompt_p=0.0, include_bos=False):
-    all_conversations = []
-    with open(file_path, 'r') as f:
-        for line_number, line in enumerate(f, 1):
-            data = json.loads(line)
-            conversation = data.get(conversation_field)
-            all_conversations.append(conversation)
-
-    random.shuffle(all_conversations)
+    def load_and_shuffle(seed):
+        conversations = []
+        with open(file_path, 'r') as f:
+            for line_number, line in enumerate(f, 1):
+                data = json.loads(line)
+                conversation = data.get(conversation_field)
+                conversations.append(conversation)
+        # Use a dedicated RNG for deterministic shuffles per epoch without affecting global RNG
+        rng = random.Random(seed)
+        rng.shuffle(conversations)
+        return conversations
 
     def gen():
-        for conversation in all_conversations:
-            remove_system_prompt = (random.random() < remove_system_prompt_p)
-            text = format_chat_prompt(conversation, tokenizer, model_name, remove_system_prompt=remove_system_prompt, include_bos=include_bos)
-            yield text
+        seed = 42
+        while True:
+            conversations = load_and_shuffle(seed)
+            if not conversations:
+                raise RuntimeError(f"local_chat_dataset_to_generator: file '{file_path}' has no conversations for field '{conversation_field}'.")
+            for conversation in conversations:
+                remove_system_prompt = (random.random() < remove_system_prompt_p)
+                text = format_chat_prompt(conversation, tokenizer, model_name, remove_system_prompt=remove_system_prompt, include_bos=include_bos)
+                yield text
+            seed += 1
     
     return gen()
 
 def mixed_dataset_generator(generators_with_proportions):
     active_generators_info = []
     for gen, prop in generators_with_proportions:
-        if prop <= 0:
-            raise ValueError(f"Generator {gen} has a proportion of {prop}, which is not positive.")
+        if prop < 0:
+            raise ValueError(f"Generator {gen} has a proportion of {prop}, which is negative.")
         active_generators_info.append({"generator": gen, "proportion": prop})
 
     if not active_generators_info:
