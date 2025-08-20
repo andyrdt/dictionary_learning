@@ -15,12 +15,16 @@ We also provide a [demonstration](https://github.com/adamkarvonen/dictionary_lea
 
 # Using trained dictionaries
 
-You can load and used a pretrained dictionary as follows
+You can load and used a pretrained dictionary as follows.
+Also, look in utils.py to see more useful functions in order to load SAEs.
 ```python
-from dictionary_learning import AutoEncoder
+from dictionary_learning import AutoEncoder, utils
 
-# load autoencoder
+# load autoencoder (This specifically loads standard SAE, not other architectures)
 ae = AutoEncoder.from_pretrained("path/to/dictionary/weights")
+
+# or you can use this method from utils to load any architecture
+ae, config = utils.load_dictionary("path/to/dictionary/weights", device=device)
 
 # get NN activations using your preferred method: hooks, transformer_lens, nnsight, etc. ...
 # for now we'll just use random activations
@@ -57,35 +61,42 @@ This repository supports different sparse autoencoder architectures, including s
 Each sparse autoencoder architecture is implemented with a corresponding trainer that implements the training protocol described by the authors.
 This allows us to implement different training protocols (e.g. p-annealing) for different architectures without a lot of overhead.
 Specifically, this repository supports the following trainers:
-- [`StandardTrainer`](trainers/standard.py): Implements a training scheme similar to that of [Bricken et al., 2023](https://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-autoencoder).
-- [`GatedSAETrainer`](trainers/gdm.py): Implements the training scheme for Gated SAEs described in [Rajamanoharan et al., 2024](https://arxiv.org/abs/2404.16014).
-- [`TopKSAETrainer`](trainers/top_k.py): Implemented the training scheme for Top-K SAEs described in [Gao et al., 2024](https://arxiv.org/abs/2406.04093).
-- [`BatchTopKSAETrainer`](trainers/batch_top_k.py): Implemented the training scheme for Batch Top-K SAEs described in [Bussmann et al., 2024](https://arxiv.org/abs/2412.06410).
-- [`JumpReluTrainer`](trainers/jumprelu.py): Implemented the training scheme for JumpReLU SAEs described in [Rajamanoharan et al., 2024](https://arxiv.org/abs/2407.14435).
-- [`PAnnealTrainer`](trainers/p_anneal.py): Extends the `StandardTrainer` by providing the option to anneal the sparsity parameter p.
-- [`GatedAnnealTrainer`](trainers/gated_anneal.py): Extends the `GatedSAETrainer` by providing the option for p-annealing, similar to `PAnnealTrainer`.
+- [`StandardTrainer`](dictionary_learning/trainers/standard.py): Implements a training scheme similar to that of [Bricken et al., 2023](https://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-autoencoder).
+- [`GatedSAETrainer`](dictionary_learning/trainers/gdm.py): Implements the training scheme for Gated SAEs described in [Rajamanoharan et al., 2024](https://arxiv.org/abs/2404.16014).
+- [`TopKSAETrainer`](dictionary_learning/trainers/top_k.py): Implemented the training scheme for Top-K SAEs described in [Gao et al., 2024](https://arxiv.org/abs/2406.04093).
+- [`BatchTopKSAETrainer`](dictionary_learning/trainers/batch_top_k.py): Implemented the training scheme for Batch Top-K SAEs described in [Bussmann et al., 2024](https://arxiv.org/abs/2412.06410).
+- [`JumpReluTrainer`](dictionary_learning/trainers/jumprelu.py): Implemented the training scheme for JumpReLU SAEs described in [Rajamanoharan et al., 2024](https://arxiv.org/abs/2407.14435).
+- [`PAnnealTrainer`](dictionary_learning/trainers/p_anneal.py): Extends the `StandardTrainer` by providing the option to anneal the sparsity parameter p.
+- [`GatedAnnealTrainer`](dictionary_learning/trainers/gated_anneal.py): Extends the `GatedSAETrainer` by providing the option for p-annealing, similar to `PAnnealTrainer`.
+- [`MatryoshkaBatchTopKTrainer`](dictionary_learning/trainers/matryoshka_batch_top_k.py): Extends the `BatchTopKSAETrainer` by providing the option to apply Matryoshka-style prefix loss training, enabling hierarchical feature learning within a Top-K sparse autoencoder framework.
 
 Another key object is the `ActivationBuffer`, defined in `buffer.py`. Following [Neel Nanda's appraoch](https://www.lesswrong.com/posts/fKuugaxt2XLTkASkk/open-source-replication-and-commentary-on-anthropic-s), `ActivationBuffer`s maintain a buffer of NN activations, which it outputs in batches.
 
 An `ActivationBuffer` is initialized from an `nnsight` `LanguageModel` object, a submodule (e.g. an MLP), and a generator which yields strings (the text data). It processes a large number of strings, up to some capacity, and saves the submodule's activations. You sample batches from it, and when it is half-depleted, it refreshes itself with new text data.
 
 Here's an example for training a dictionary; in it we load a language model as an `nnsight` `LanguageModel` (this will work for any Huggingface model), specify a submodule, create an `ActivationBuffer`, and then train an autoencoder with `trainSAE`.
+
+NOTE: This is a simple reference example. For an example with standard hyperparameter settings, HuggingFace dataset usage, etc, we recommend referring to this [demonstration](https://github.com/adamkarvonen/dictionary_learning_demo).
 ```python
 from nnsight import LanguageModel
-from dictionary_learning import ActivationBuffer, AutoEncoder
-from dictionary_learning.trainers import StandardTrainer
+from dictionary_learning import ActivationBuffer
+from dictionary_learning.trainers.top_k import TopKTrainer, AutoEncoderTopK
 from dictionary_learning.training import trainSAE
 
 device = "cuda:0"
-model_name = "EleutherAI/pythia-70m-deduped" # can be any Huggingface model
+model_name = "EleutherAI/pythia-70m-deduped"  # can be any Huggingface model
 
 model = LanguageModel(
     model_name,
     device_map=device,
 )
-submodule = model.gpt_neox.layers[1].mlp # layer 1 MLP
-activation_dim = 512 # output dimension of the MLP
+layer = 1
+submodule = model.gpt_neox.layers[1].mlp  # layer 1 MLP
+activation_dim = 512  # output dimension of the MLP
 dictionary_size = 16 * activation_dim
+llm_batch_size = 16
+sae_batch_size = 128
+training_steps = 20
 
 # data must be an iterator that outputs strings
 data = iter(
@@ -94,30 +105,43 @@ data = iter(
         "In real life, for training a dictionary",
         "you would need much more data than this",
     ]
+    * 100000
 )
+
 buffer = ActivationBuffer(
     data=data,
     model=model,
     submodule=submodule,
-    d_submodule=activation_dim, # output dimension of the model component
-    n_ctxs=3e4,  # you can set this higher or lower dependong on your available memory
+    d_submodule=activation_dim,  # output dimension of the model component
+    n_ctxs=int(
+        1e2
+    ),  # you can set this higher or lower depending on your available memory
     device=device,
+    refresh_batch_size=llm_batch_size,
+    out_batch_size=sae_batch_size,
 )  # buffer will yield batches of tensors of dimension = submodule's output dimension
 
 trainer_cfg = {
-    "trainer": StandardTrainer,
-    "dict_class": AutoEncoder,
+    "trainer": TopKTrainer,
+    "dict_class": AutoEncoderTopK,
     "activation_dim": activation_dim,
     "dict_size": dictionary_size,
     "lr": 1e-3,
     "device": device,
+    "steps": training_steps,
+    "layer": layer,
+    "lm_name": model_name,
+    "warmup_steps": 1,
+    "k": 100,
 }
 
 # train the sparse autoencoder (SAE)
 ae = trainSAE(
     data=buffer,  # you could also use another (i.e. pytorch dataloader) here instead of buffer
     trainer_configs=[trainer_cfg],
+    steps=training_steps,  # The number of training steps. Total trained tokens = steps * batch_size
 )
+
 ```
 Some technical notes our training infrastructure and supported features:
 * Training uses the `ConstrainedAdam` optimizer defined in `training.py`. This is a variant of Adam which supports constraining the `AutoEncoder`'s decoder weights to be norm 1.
