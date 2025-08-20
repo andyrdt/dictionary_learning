@@ -10,6 +10,16 @@ class EarlyStopException(Exception):
 
     pass
 
+def print_norm_stats(x: t.Tensor, dim=-1, name="norms"):
+    x = t.linalg.vector_norm(x.float(), dim=dim)
+    q = t.tensor([.25,.5,.75,.99,.9999], device=x.device)
+    p25, med, p75, p99, p9999 = t.quantile(x, q).tolist()
+    mean, std, mn, mx = map(float, (x.mean(), x.std(), x.min(), x.max()))
+    print(f"{name} fp32 | μ={mean:.6f} σ={std:.6f} min={mn:.6f} "
+          f"p25={p25:.6f} med={med:.6f} p75={p75:.6f} "
+          f"p99={p99:.6f} p99.99={p9999:.6f} max={mx:.6f}")
+    if mx > med * 10:
+        print(f"WARNING: max/med={mx/med:.2f} ({mx:.6f} vs {med:.6f})")
 
 def collect_activations(
     model: AutoModelForCausalLM,
@@ -88,7 +98,8 @@ class ActivationBuffer:
         out_batch_size=8192,  # size of batches in which to yield activations
         device="cpu",  # device on which to store the activations
         remove_bos: bool = False,
-        add_special_tokens: bool = True,
+        add_special_tokens: bool = False,
+        remove_sys_activations_p: float = 0.95,
     ):
         if io not in ["in", "out"]:
             raise ValueError("io must be either 'in' or 'out'")
@@ -123,6 +134,8 @@ class ActivationBuffer:
 
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        self.remove_sys_activations_p = remove_sys_activations_p
 
     def __iter__(self):
         return self
@@ -168,6 +181,41 @@ class ActivationBuffer:
             truncation=True,
             add_special_tokens=self.add_special_tokens,
         ).to(self.device)
+    
+    def _get_system_prompt_mask(self, input_ids, prefix_len=3, p=1.0):
+        batch, seq = input_ids.shape
+        device, dtype = input_ids.device, input_ids.dtype
+
+        assert self.tokenizer.padding_side == "right", "Assuming right padding for left alignment."
+
+        sys_prompt_toks = self.tokenizer.apply_chat_template(
+            [{'content': '', 'role': 'user'}],
+            tokenize=True
+        )[:-1]  # trim trailing end token
+
+        sys_prompt_toks = t.tensor(sys_prompt_toks, device=device, dtype=dtype)
+        sys_prompt_len = sys_prompt_toks.shape[-1]
+        sys_prompt_prefix = sys_prompt_toks[:prefix_len]
+
+        if self.tokenizer.bos_token_id is not None:
+            # start_col is 1 if starts with bos, 0 otherwise
+            start_col = (input_ids[:, 0] == self.tokenizer.bos_token_id).long()
+        else:
+            start_col = t.zeros(input_ids.shape[0], dtype=dtype, device=device)
+        
+        ar_prefix = t.arange(prefix_len, device=device) # [0, 1, 2]
+        idx_prefix = start_col[:, None] + ar_prefix # [0, 1, 2] or [1, 2, 3] depending on bos
+        prefix_window = input_ids.gather(dim=-1, index=idx_prefix) # first 3 of each row (excluding bos)
+        chat_rows = t.all(prefix_window == sys_prompt_prefix, dim=-1)
+
+        pos = t.arange(seq, device=device)
+        sys_prompt_mask = (pos >= start_col[:, None]) & (pos < start_col[:, None] + sys_prompt_len)
+        sys_prompt_mask = sys_prompt_mask & chat_rows[:, None]
+
+        # randomly select w.p. p
+        sys_prompt_mask = sys_prompt_mask & (t.rand((batch), device=device) < p)[:, None]
+
+        return sys_prompt_mask
 
     def refresh(self):
         gc.collect()
@@ -193,10 +241,19 @@ class ActivationBuffer:
                 input = self.tokenized_batch()
                 hidden_states = collect_activations(self.model, self.submodule, input)
             mask = (input["attention_mask"] != 0)
-            if self.remove_bos:
+            if self.remove_bos: # applies to pt data
                 bos_mask = (input["input_ids"] == self.tokenizer.bos_token_id)
                 mask = mask & ~bos_mask
+
+                # we're going to additionally mask out the first token position, even for chat data, because empirically it has huge norm
+                mask[:, 0] = False
+
+            sys_prompt_mask = self._get_system_prompt_mask(input["input_ids"], prefix_len=3, p=self.remove_sys_activations_p)
+            mask = mask & ~sys_prompt_mask
+
             hidden_states = hidden_states[mask]
+
+            # print_norm_stats(hidden_states, dim=-1)
 
             remaining_space = self.activation_buffer_size - current_idx
             assert remaining_space > 0

@@ -1,0 +1,30 @@
+{
+    "model_name": "openai/gpt-oss-20b",
+
+    "num_tokens": 500000000,
+    "buffer_tokens": 250000,
+    "architectures": ["batch_top_k"],
+    "dictionary_widths": [131072],
+    "target_l0s": [64, 128],
+    "layers": [3],
+    "learning_rates": [1e-4],
+    "llm_batch_size": 8,
+    "llm_context_length": 2048,
+    "sae_batch_size": 4096,
+    "dtype": "bfloat16",
+
+    "use_wandb": true,
+    "wandb_project": "sae-sweep",
+    "wandb_name_prefix": "0_l03",
+    "save_dir": "/workspace/sae/gpt-oss-20b/runs/0_l03",
+    "save_checkpoints": false,
+    "hf_repo_id": null,
+
+    "device": "cuda",
+    "random_seeds": [0],
+    "eval_num_inputs": 200,
+    "log_steps": 50,
+    "chat_data_fraction": 0.75,
+    "pretrain_data_fraction": 0.25,
+    "remove_sys_activations_p": 0.95
+}
