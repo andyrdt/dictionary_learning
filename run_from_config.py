@@ -153,6 +153,7 @@ def run_sae_training(
 
 @t.no_grad()
 def eval_saes(
+    layer: int,
     ae_paths: list[str],
     config: dict
 ) -> dict:
@@ -224,7 +225,6 @@ def eval_saes(
             io=io,
             device=config["device"],
             n_batches=n_batches,
-            remove_bos=True,
         )
 
         hyperparameters = {
@@ -289,7 +289,7 @@ if __name__ == "__main__":
 
     ae_paths = utils.get_nested_folders(experiment_base_save_dir)
 
-    eval_saes(ae_paths, config)
+    eval_saes(layer, ae_paths, config)
 
     print(f"Total time: {time.time() - start_time}")
 
